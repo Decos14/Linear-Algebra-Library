@@ -6,7 +6,7 @@ contains
     function Transpose (A) result(AT) 
         implicit none
         real, intent(in) :: A(:,:)
-        real::AT(size(A,1),size(A,2)) 
+        real::AT(size(A,2),size(A,1)) 
         integer :: i,j,n,m
         n = size(A,1)
         m = size(A,2)
@@ -21,12 +21,12 @@ contains
         implicit none
         real, intent(in) :: A(:,:), B(:,:)
         real:: C(size(A,1), size(B,2))
-        integer :: i,j,k,n,m
+        integer :: i,j,k
         
         C(:,:) = 0
-        do i = 1,size(A,2)
-            do j = 1,size(b,2)
-                do k = 1,size(b,1)
+        do i = 1,size(A,1)
+            do j = 1,size(B,2)
+                do k = 1,size(A,2)
                     C(i,j) = C(i,j) + (A(i,k) * b(k,j))
                 enddo
             enddo
@@ -345,29 +345,6 @@ contains
         enddo
     end function Eigenvalues
 
-    subroutine Pos_QR_eig(A, v, e_vect)
-        real, intent(in) :: A(:,:)
-        real, intent(inout) :: e_vect(:,:), v(:,:)
-        real::Q(size(A,1), size(A,1)),R(size(A,1), size(A,1)), Ak(size(A,1),size(A,1)) 
-        real::v_prev(size(A,1),1),eps,err
-        integer::i
-        Ak = A
-        eps = 0.00000000001
-        err = 1
-        e_vect = Identity(size(A,1))
-
-        do while(err > eps)
-            v_prev = v
-            call QR_Factor(Ak,Q,R)
-            e_vect = MatMul(e_vect,Q)
-            Ak = MatMul(R,Q)
-            do i = 1,size(A,1)
-                v(i,1) = Ak(i,i)
-            enddo
-            err = P_Norm_Vect(v - v_prev,2)
-        enddo
-    end subroutine Pos_QR_eig
-
     function SI_Power_Method(A, e) result(v)
         real, intent(in) :: A(:,:), e
         real:: v(size(A,1),1)
@@ -408,31 +385,29 @@ contains
         enddo
     end function Eigenvectors
 
-    subroutine SVD(A,U,Sigma,V)
-        real, intent(in) :: A(:,:)
-        real, intent(inout) :: U(:,:),Sigma(:,:),V(:,:)
-        real:: K(size(A,2), size(A,2)), e_val(size(k,1), 1), ui(size(U,1),1), vi(size(V,1),1)
-        integer::i,j
+    subroutine Pos_QR_eig(K, e_val, e_vect)
+        real, intent(in) :: K(:,:)
+        real, intent(inout) :: e_vect(:,:), e_val(:,:)
+        real::Q(size(K,1), size(K,1)),R(size(K,1), size(K,1)), Ki(size(K,1),size(K,1)) 
+        real::e_prev(size(e_val),1),eps,err
+        integer::i
+        Ki = K
+        eps = 0.00000000001
+        err = 1
+        e_vect = Identity(size(e_vect))
 
-        K = MatMul(Transpose(A), A)
-        call Pos_QR_eig(K,e_val,V)
-
-        Sigma(:,:) = 0
-        do i = 1, size(Sigma,1)
-            Sigma(i,i) = sqrt(e_val(i,1))
-        enddo
-
-        do i = 1,size(U,2)
-            do j = 1, size(V,1)
-                vi(j,1) = V(j,i)
+        do while(err > eps)
+            e_prev = e_val
+            call QR_Factor(Ki,Q,R)
+            e_vect = MatMul(e_vect,Q)
+            Ki = MatMul(R,Q)
+            do i = 1,size(Ki,1)
+                e_val(i,1) = Ki(i,i)
             enddo
-            ui = MatMul(A,vi)/Sigma(i,i)
-            do j = 1, size(U,1)
-                U(j,i) = ui(j,1)
-            enddo
+            err = P_Norm_Vect(e_val - e_prev,2)
         enddo
-    end subroutine SVD
-
+    end subroutine Pos_QR_eig
+ 
     function Diag_Inv(A) result(A_inv)
         real, intent(in) :: A(:,:)
         real::A_inv(size(A,2), size(A,1))
@@ -458,6 +433,30 @@ contains
         enddo
     end function Singular_Values
 
+    subroutine SVD(A,U,Sigma,V)
+        real, intent(in) :: A(:,:)
+        real, intent(inout) :: U(:,:),Sigma(:,:),V(:,:)
+        real:: K(size(A,2), size(A,2)), e_val(size(K,1), 1), ui(size(U,1),1), vi(size(V,1),1)
+        integer::i,j
+
+        K = MatMul(Transpose(A), A)
+        call Pos_QR_eig(K,e_val,V)
+
+        Sigma(:,:) = 0
+        do i = 1, size(Sigma,1)
+            Sigma(i,i) = sqrt(e_val(i,1))
+        enddo
+
+        do i = 1,size(U,2)
+            do j = 1, size(V,1)
+                vi(j,1) = V(j,i)
+            enddo
+            ui = MatMul(A,vi)/Sigma(i,i)
+            do j = 1, size(U,1)
+                U(j,i) = ui(j,1)
+            enddo
+        enddo
+    end subroutine SVD
 
     function MP_Inv(A) result(A_inv)
         real, intent(in) :: A(:,:)
@@ -472,11 +471,10 @@ contains
     ! Print matrix A to screen
     subroutine print_matrix(A)
         real, intent(in) :: A(:,:)  ! An assumed-shape dummy argument
-
         integer :: i
 
         do i = 1, size(A,1)
-        print *, A(i,:)
+            print *, A(i,:)
         end do
 
     end subroutine print_matrix
@@ -487,8 +485,7 @@ end module
 program use_mod
     use linalg
     implicit none
-
-    real :: A(3,3), U(3,3), E(3,3), V(3,3)
+    real :: A(3,2), U(size(A,1),size(A,2)), E(size(A,2),size(A,2)), V(size(A,2),size(A,2))
     integer :: i,j
 
     do i = 1,size(A,1)
@@ -496,7 +493,7 @@ program use_mod
             A(i,j) = size(A,2)*(i-1) + j
         end do
     end do
-    A(3,2) = 10
+    !A(3,2) = 10
 
     call SVD(A,U,E,V)
 
@@ -508,7 +505,7 @@ program use_mod
     Write(*,*)
     call print_matrix(V)
     Write(*,*)
-
+    call print_matrix(MatMul(U,MatMul(E,Transpose(V))))
 
 
 end program use_mod
