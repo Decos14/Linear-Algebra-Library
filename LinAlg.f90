@@ -83,6 +83,7 @@ contains
 
     end function Determinant
 
+    ! Produces an nxn Identity matrix
     function Identity(n) result(I)
         implicit none
         integer, intent(in) :: n
@@ -94,6 +95,7 @@ contains
         enddo
     end function Identity
 
+    ! takes a matrix A to an integer power
     function Mat_Pwr(A,n) result(B)
         implicit none
         integer, intent(in) :: n
@@ -140,6 +142,7 @@ contains
         endif
     end function Is_Symmetric
 
+    !Solves upper tringular systems
     function U_solve(U,b) result(x)
         real, intent(in) :: U(:,:), b(:,:)
         real:: x(size(b),1)
@@ -156,6 +159,7 @@ contains
         enddo
     end function U_solve
 
+    ! Solves lower triangular systems
     function L_solve(L,b) result(x)
         real, intent(in) :: L(:,:), b(:,:)
         real:: x(size(b),1)
@@ -201,6 +205,7 @@ contains
 
     end function Inverse
 
+    ! Finds the innter product of two matricies defined by matrix A
     function Inner_Product(u,v,A) result(c)
         real, intent(in) :: A(:,:), u(:,:), v(:,:)
         real::temp(1,1)
@@ -223,6 +228,7 @@ contains
         enddo   
     end function Inf_Norm_Vect
 
+    ! Computes the p-norm of a vector for any integer p
     function P_Norm_Vect(v,p) result(c)
         real, intent(in) :: v(:,:)
         integer, intent(in) :: p
@@ -275,6 +281,7 @@ contains
         c = Inf_Norm_Vect(v)
     end function Inf_Norm_Mat
 
+    ! Computes the Frobenius norm of any given Matrix
     function F_Norm_Mat(A) result(c)
         real, intent(in) :: A(:,:)
         real:: c
@@ -290,6 +297,7 @@ contains
         c = c**(1.0/2.0)
     end function F_Norm_Mat
 
+    ! Finds the least squares solution to a system 
     function Least_Squares(A,b) result(x)
         real, intent(in) :: A(:,:), b(:,:)
         real:: x(size(A,2), 1)
@@ -345,6 +353,7 @@ contains
         enddo
     end function Eigenvalues
 
+    !Uses the shifted inverse power method to find the nearest eigenvector to a given eigenvalue guess
     function SI_Power_Method(A, e) result(v)
         real, intent(in) :: A(:,:), e
         real:: v(size(A,1),1)
@@ -385,6 +394,7 @@ contains
         enddo
     end function Eigenvectors
 
+    ! Simultanuesly finds both eigenvalues and eigenvectors for posative definite matricies
     subroutine Pos_QR_eig(K, e_val, e_vect)
         real, intent(in) :: K(:,:)
         real, intent(inout) :: e_vect(:,:), e_val(:,:)
@@ -394,7 +404,7 @@ contains
         Ki = K
         eps = 0.00000000001
         err = 1
-        e_vect = Identity(size(e_vect))
+        e_vect = Identity(size(e_vect,1))
 
         do while(err > eps)
             e_prev = e_val
@@ -407,7 +417,8 @@ contains
             err = P_Norm_Vect(e_val - e_prev,2)
         enddo
     end subroutine Pos_QR_eig
- 
+    
+    !Inverse of a diagonal matrix (not neccesarily square)
     function Diag_Inv(A) result(A_inv)
         real, intent(in) :: A(:,:)
         real::A_inv(size(A,2), size(A,1))
@@ -433,6 +444,7 @@ contains
         enddo
     end function Singular_Values
 
+    !Singular value decomposition of a matrix
     subroutine SVD(A,U,Sigma,V)
         real, intent(in) :: A(:,:)
         real, intent(inout) :: U(:,:),Sigma(:,:),V(:,:)
@@ -458,19 +470,19 @@ contains
         enddo
     end subroutine SVD
 
+    ! Moore-Penrose Psuedoinverse of a matrix
     function MP_Inv(A) result(A_inv)
         real, intent(in) :: A(:,:)
         real::A_inv(size(A,2), size(A,1))
-        real::U(size(A,1), size(A,1)), E(size(A,1),size(A,2)), V(size(A,2),size(A,2))
+        real::U(size(A,1),size(A,2)), E(size(A,2),size(A,2)), V(size(A,2),size(A,2))
 
         call SVD(A,U,E,V)
 
         A_inv = MatMul(V,MatMul(Diag_Inv(E),Transpose(U)))
     end function MP_Inv
 
-    ! Print matrix A to screen
     subroutine print_matrix(A)
-        real, intent(in) :: A(:,:)  ! An assumed-shape dummy argument
+        real, intent(in) :: A(:,:)
         integer :: i
 
         do i = 1, size(A,1)
@@ -479,33 +491,33 @@ contains
 
     end subroutine print_matrix
 
+    subroutine populate(A)
+        real, intent(inout) :: A(:,:)
+        integer::i,j
+
+        do i = 1,size(A,1)
+            do j = 1,size(A,2)
+                A(i,j) = size(A,2)*(i-1) + j
+            end do
+        end do
+    end subroutine populate
+
 
 end module 
 
 program use_mod
     use linalg
     implicit none
-    real :: A(3,2), U(size(A,1),size(A,2)), E(size(A,2),size(A,2)), V(size(A,2),size(A,2))
-    integer :: i,j
 
-    do i = 1,size(A,1)
-        do j = 1,size(A,2)
-            A(i,j) = size(A,2)*(i-1) + j
-        end do
-    end do
-    !A(3,2) = 10
+    real::A(3,2), A_inv(size(A,2), size(A,1))
 
-    call SVD(A,U,E,V)
+    call populate(A)
+
+    A_inv = MP_Inv(A)
 
     call print_matrix(A)
     Write(*,*)
-    call print_matrix(U)
-    Write(*,*)
-    call print_matrix(E)
-    Write(*,*)
-    call print_matrix(V)
-    Write(*,*)
-    call print_matrix(MatMul(U,MatMul(E,Transpose(V))))
+    call print_matrix(A_inv)
 
 
 end program use_mod
