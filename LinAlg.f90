@@ -1,5 +1,7 @@
 module linalg
+    USE, INTRINSIC :: IEEE_ARITHMETIC
     implicit none
+
 
 contains
 
@@ -102,10 +104,14 @@ contains
         real, intent(in) :: A(:,:)
         real:: B(size(A,1), size(A,2))
         integer::i
-        B = A
-        do i = 1,n-1
-            B = MatMul(A,B)
-        enddo
+        if(n == 0) then
+            B = Identity(size(A,1))
+        else
+            B = A
+            do i = 1,n-1
+                B = MatMul(A,B)
+            enddo
+        endif
     end function Mat_Pwr
 
     function Trace(A) result(n)
@@ -176,7 +182,7 @@ contains
         enddo
     end function L_solve
 
-    function solve(A,b) result(x)
+    function LU_solve(A,b) result(x)
         real, intent(in) :: A(:,:), b(:,:)
         real:: x(size(A,2),1), y(size(A,1),1)
         real::L(size(A,1), size(A,1)), U(size(A,1),size(A,2))
@@ -185,7 +191,7 @@ contains
         
         y = L_solve(L,b)
         x = U_solve(U,y)
-    end function solve
+    end function LU_solve
 
     function Inverse(A) result(AT)
         real, intent(in) :: A(:,:)
@@ -197,7 +203,7 @@ contains
         do i = 1, size(A,1)
             ei(:,:) = 0
             ei(i,1) = 1
-            temp = solve(A,ei)
+            temp = LU_solve(A,ei)
             do j = 1, size(A,2)
                 AT(j,i) = temp(j,1)
             enddo
@@ -302,7 +308,7 @@ contains
         real, intent(in) :: A(:,:), b(:,:)
         real:: x(size(A,2), 1)
         
-        x = solve(MatMul(Transpose(A),A), MatMul(Transpose(A),b))
+        x = LU_solve(MatMul(Transpose(A),A), MatMul(Transpose(A),b))
     end function Least_Squares
 
     subroutine QR_Factor(A,Q,R)
@@ -481,6 +487,39 @@ contains
         A_inv = MatMul(V,MatMul(Diag_Inv(E),Transpose(U)))
     end function MP_Inv
 
+    function factorial(n) result(f)
+        real, intent(in) :: n
+        real::f, i
+        f = 1
+        i = n
+        do while(i > 0)
+            f = f * i
+            i = i - 1
+        enddo
+    end function factorial
+
+    ! Computes the matrix e^(tA)
+    function exp(A, t) result(E)
+        real, intent(in) :: A(:,:), t
+        real::E(size(A,1), size(A,1)), pwr(size(A,1), size(A,2)), eps, err, f_val, f_prev, n
+        eps = 0.0001
+        err = 1
+        n = 1
+        E = Identity(size(E,1))
+
+        do while(err > eps)
+            pwr = Mat_Pwr(A,int(n))
+            if(pwr(1,1) /= pwr(1,1) .or. ieee_is_finite(pwr(1,1))) then
+                E = E + (((t**n)/factorial(n))*pwr)
+                f_val = F_Norm_Mat(E)
+                err = abs(f_val - f_prev)
+            else
+                err = 0
+            endif
+            n = n + 1
+        enddo
+    end function exp
+
     subroutine print_matrix(A)
         real, intent(in) :: A(:,:)
         integer :: i
@@ -509,15 +548,19 @@ program use_mod
     use linalg
     implicit none
 
-    real::A(3,2), A_inv(size(A,2), size(A,1))
+    real::A(3,3), A_exp(3,3)
+    integer :: i
 
     call populate(A)
 
-    A_inv = MP_Inv(A)
+    ! errors in populate matrix going to inf????
+    ! errors in incorrect solution by orders of magnitude????
+    A_exp = exp(A,1.0)
 
     call print_matrix(A)
     Write(*,*)
-    call print_matrix(A_inv)
+    call print_matrix(A_exp)
+    Write(*,*)
 
 
 end program use_mod
