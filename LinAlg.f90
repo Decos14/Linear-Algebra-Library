@@ -211,6 +211,24 @@ contains
 
     end function Inverse
 
+    function L_Inverse(L) result(L_inv)
+        real, intent(in) :: L(:,:)
+        real:: L_inv(size(L,1), size(L,1))
+        real::temp(size(L,1), 1), ei(size(L,1), 1)
+        integer::i,j
+
+        
+        do i = 1, size(L,1)
+            ei(:,:) = 0
+            ei(i,1) = 1
+            temp = L_solve(L,ei)
+            do j = 1, size(L,2)
+                L_inv(j,i) = temp(j,1)
+            enddo
+        enddo
+
+    end function L_Inverse
+
     ! Finds the innter product of two matricies defined by matrix A
     function Inner_Product(u,v,A) result(c)
         real, intent(in) :: A(:,:), u(:,:), v(:,:)
@@ -520,6 +538,113 @@ contains
         enddo
     end function exp
 
+    function Gram_Schmidt(A) result(Q)
+        real, intent(in) :: A(:,:)
+        real::Q(size(A,1), size(A,2)), v(size(A,1),size(A,2))
+        integer::i,j
+
+    end function Gram_Schmidt
+
+    function Outer_Product(u,v) result(A)
+        real, intent(in) :: u(:,:), v(:,:)
+        real::A(size(u),size(v))
+        integer::i,j
+
+        do i = 1,size(A,2)
+            do j = 1,size(A,1)
+                A(i,j) = u(i,1)*v(j,1)
+            enddo
+        enddo   
+    end function Outer_Product
+
+    function diag(A) result(D)
+        real, intent(in) :: A(:,:)
+        real::D(size(A,1), size(A,2))
+        integer::i
+        D(:,:) = 0
+        do i = 1,size(D,1)
+            D(i,i) = A(i,i)
+        enddo
+    end function diag
+
+    !Uses jacobi iteration to solve a matrix system, requires a 
+    !diagonally dominant matrix for garunteed conversion
+    function Jacobi_Solve(A,b, x_guess) result(x)
+        real, intent(in) :: A(:,:), b(:,:)
+        real::x(size(b),1), x_prev(size(b),1), err, eps
+        real::D(size(A,1), size(A,2)), D_inv(size(A,1), size(A,2))
+        real,optional :: x_guess(size(b),1)
+        integer::i,j
+
+        if(present(x_guess))then
+            x = x_guess
+        else
+            x(:,1) = 1
+        endif
+        eps = 0.00001
+        err = 1
+        D = diag(A)
+        D_inv = Diag_Inv(D)
+
+        do while(err > eps)
+            x_prev = x
+            x = MatMul(D_inv,b-MatMul(A,x_prev))
+            err = P_Norm_Vect(x,2)
+            x = x_prev + x
+        enddo
+    end function Jacobi_Solve
+
+    function Gauss_Seidel_Solve(A,b, x_guess) result(x)
+        real, intent(in) :: A(:,:), b(:,:)
+        real::x(size(b),1), x_prev(size(b),1), ei(size(b),1), temp(size(b),1), err, eps
+        real::L(size(A,1), size(A,2)), U(size(A,1), size(A,2)), L_inv(size(A,1), size(A,2))
+        real,optional :: x_guess(size(b),1)
+        integer::i,j
+
+        if(present(x_guess))then
+            x = x_guess
+        else
+            x(:,1) = 1
+        endif
+        eps = 0.00001
+        err = 1
+        L = A
+        U = A
+        do i = 1, size(A,1)
+            do j = 1,size(A,2)
+                if(i >= j) then
+                    U(i,j) = 0
+                else
+                    L(i,j) = 0
+                endif
+            enddo
+        enddo
+        L_inv = L_Inverse(L)
+
+        do while(err > eps)
+            x_prev = x
+            x = MatMul(L_inv,b-MatMul(U,x_prev))
+            err = P_Norm_Vect(x,2)- P_Norm_Vect(x_prev,2)
+        enddo
+    end function Gauss_Seidel_Solve
+
+    function Is_Diag_Dom(A) result(b)
+        real, intent(in) :: A(:,:)
+        logical::b
+        real::row
+        integer::i,j
+        b = .True.
+
+        do i = 1,size(A,1)
+            row = 0
+            do j = 1,size(A,2)
+                row = row + A(i,j)
+            enddo
+            row = row - A(i,i)
+            b = b .and. (A(i,i) > row)
+        enddo
+    end function Is_Diag_Dom
+
     subroutine print_matrix(A)
         real, intent(in) :: A(:,:)
         integer :: i
@@ -548,18 +673,23 @@ program use_mod
     use linalg
     implicit none
 
-    real::A(3,3), A_exp(3,3)
-    integer :: i
+    real::A(3,3),b(3,1),x(3,1), c(3,1)
+    integer :: i,j
 
-    call populate(A)
+    A = reshape((/3,1,-2,1,-4,-1,-1,2,5/), shape(A))
+    c = reshape((/0.2,0.09,0.38/), shape(c))
+    call populate(b)
+    b(1,1) = 1
 
-    ! errors in populate matrix going to inf????
-    ! errors in incorrect solution by orders of magnitude????
-    A_exp = exp(A,1.0)
+    x = Jacobi_Solve(A,b,c)
 
     call print_matrix(A)
     Write(*,*)
-    call print_matrix(A_exp)
+    call print_matrix(b)
+    Write(*,*)
+    call print_matrix(x)
+    Write(*,*)
+    call print_matrix(MatMul(A,x))
     Write(*,*)
 
 
